@@ -1,0 +1,151 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "Cloud Formation Template - CSYE6225 - Creating EC2 instance , Security Groups and Ingress Rules",
+	"Parameters": {
+		"EC2Name": {
+			"Type": "String"
+		},
+		"SubnetId1":{
+			"Type":"String"
+		},
+		"SubnetId2":{
+			"Type":"String"
+		},
+		"SubnetId3":{
+			"Type":"String"
+		},
+		"VpcId":{"Type":"String"},
+		"AMI":{"Type":"String"},
+		"keyName":{"Type":"String"}
+	},
+	"Resources": {
+		"ourEC2Instance": {
+			"Type": "AWS::EC2::Instance",
+			"Properties": {
+				"InstanceType": "t2.micro",
+				"DisableApiTermination": false,
+				"ImageId" : {
+					"Ref":"AMI"
+				},
+				"BlockDeviceMappings" : [
+					{
+						"DeviceName" : "/dev/sda1",
+						"Ebs" : {
+							"VolumeSize":"20",
+							"VolumeType" :"gp2"
+						}
+					}
+				],
+				"Tags" : [
+					{
+						"Key" : "Name",
+						"Value" : {"Ref":"EC2Name"}
+					}
+				],
+				"KeyName" : {"Ref":"keyName"},
+				"SecurityGroupIds" : [{
+					"Ref" : "WebServerSecurityGroup"
+				}],
+				"SubnetId" : {
+					"Ref":"SubnetId1"
+				}
+			}
+		},
+		"WebServerSecurityGroup" : {
+			"Type" : "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"GroupDescription" : "Access to ports 22, 80 & 443",
+				"GroupName" :"csye6225-bk",
+				"VpcId": {"Ref":"VpcId"},
+				"SecurityGroupIngress" : [ {
+					"IpProtocol" : "tcp",
+					"FromPort" : "22",
+					"ToPort" : "22",
+				"CidrIp" : "0.0.0.0/0" },
+				{
+					"IpProtocol" : "tcp",
+					"FromPort" : "80",
+					"ToPort" : "80",
+				"CidrIp" : "0.0.0.0/0" },
+				{
+					"IpProtocol" : "tcp",
+					"FromPort" : "443",
+					"ToPort" : "443",
+					"CidrIp" : "0.0.0.0/0"
+				} ]
+			}
+		},
+		"AWSdynamotable": {
+			"Type" : "AWS::DynamoDB::Table",
+			"Properties" : {
+				
+				"AttributeDefinitions": [
+					{
+						"AttributeName": "id",
+						"AttributeType": "S"
+					}
+				],
+				"TableName":"csye6225",
+				"KeySchema": [
+					{
+						"AttributeName": "id",
+						"KeyType": "HASH"
+					}
+				],
+				"ProvisionedThroughput":{
+					"ReadCapacityUnits" : 2,
+					"WriteCapacityUnits" : 2
+				 }
+
+			}
+		},
+		
+		"DBEC2SecurityGroup": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"VpcId" : {"Ref":"VpcId"},
+				"GroupDescription": "Open database for access",
+				"SecurityGroupIngress" : [{
+				"IpProtocol" : "tcp",
+				"FromPort" : "3306",
+				"ToPort" : "3306",
+				"CidrIp" : "0.0.0.0/0"
+				}
+			]
+			}
+		},
+
+		"dbSubnetGroup":{
+			"Type" : "AWS::RDS::DBSubnetGroup",
+			"Properties" : {
+				"DBSubnetGroupDescription" : "RDS Subnet Group",
+				"DBSubnetGroupName" : "rds",
+				"SubnetIds" : [{"Ref":"SubnetId2"},{"Ref":"SubnetId3"}]
+			  
+			 }
+		 }     ,
+		"MyRDSDB" : {
+            "Type" : "AWS::RDS::DBInstance",
+            "Properties" : {
+                "AllocatedStorage" : "10",
+                "MultiAZ" : "False",
+                "DBInstanceIdentifier" : "csye6225",
+                "DBInstanceClass" : "db.t2.medium",
+                "MasterUsername" : "csye6225master",
+                "MasterUserPassword" : "csye6225password",
+                "Engine" : "MySQL",
+				"DBName" : "csye6225",
+				"DBSubnetGroupName":{
+					"Ref":"dbSubnetGroup"
+				 },
+				 "PubliclyAccessible":true,
+				 "VPCSecurityGroups" : [{ "Fn::GetAtt": [ "DBEC2SecurityGroup", "GroupId" ]}]
+				}
+			}
+
+		}	
+			
+
+
+
+	}
